@@ -40,6 +40,14 @@ RUN if [ -f "package-lock.json" ]; then \
         npm install --production; \
     fi && npm cache clean --force
 
+# ==============================================================================
+# === LÍNEA AÑADIDA PARA SOLUCIONAR EL ERROR DE EJECUCIÓN DE PLAYWRIGHT ===
+# ==============================================================================
+# Instala las dependencias del sistema operativo requeridas por los navegadores de Playwright.
+# Esto soluciona errores como "cannot open shared object file: No such file or directory".
+RUN npx playwright install-deps
+# ==============================================================================
+
 # Copy modular application source
 COPY src/ ./src/
 
@@ -71,4 +79,5 @@ HEALTHCHECK --interval=30s --timeout=10s --start-period=15s --retries=3 \
 USER headlessx
 
 # Start the Node.js application directly (no PM2 needed in container)
+# Nota: Asegúrate de que tu archivo de inicio sea 'src/server.js'. Si es 'src/app.js', cambia el comando.
 CMD ["node", "src/server.js"]
