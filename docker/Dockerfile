@@ -21,7 +21,7 @@ RUN npm run build
 # Stage 2: Production runtime
 FROM mcr.microsoft.com/playwright:v1.55.0-noble
 
-# Install essential system dependencies
+# Install essential system dependencies (removed nginx - not needed in container)
 RUN apt-get update && apt-get install -y \
     curl \
     && rm -rf /var/lib/apt/lists/*
@@ -32,16 +32,13 @@ WORKDIR /app
 # Copy package files
 COPY package*.json ./
 
-# Install production dependencies (as root)
+# Install production dependencies
+# If package-lock.json exists, use npm ci, otherwise use npm install
 RUN if [ -f "package-lock.json" ]; then \
         npm ci --only=production; \
     else \
         npm install --production; \
     fi && npm cache clean --force
-
-# Install system dependencies for Playwright browsers
-# This is still good practice to ensure everything is present.
-RUN npx playwright install-deps
 
 # Copy modular application source
 COPY src/ ./src/
@@ -52,16 +49,9 @@ COPY --from=website-builder /app/website/out/ ./website/out/
 # Create logs directory
 RUN mkdir -p logs
 
-# ==============================================================================
-# === CAMBIO CLAVE PARA SOLUCIONAR EL ERROR DE PERMISOS ===
-# ==============================================================================
 # Create non-root user for security
 RUN groupadd -r headlessx && useradd -r -g headlessx headlessx
-
-# Change ownership of the entire app directory AND the root cache where Playwright
-# stores its browsers. This allows the 'headlessx' user to execute them correctly.
-RUN chown -R headlessx:headlessx /app /root/.cache
-# ==============================================================================
+RUN chown -R headlessx:headlessx /app
 
 # Environment variables (override with docker-compose or runtime)
 ENV NODE_ENV=production
@@ -70,7 +60,7 @@ ENV AUTH_TOKEN=""
 ENV DOMAIN=localhost
 ENV SUBDOMAIN=headlessx
 
-# Expose the application port directly
+# Expose the application port directly (no nginx proxy needed)
 EXPOSE 3000
 
 # Health check targets the Node.js application directly
@@ -80,6 +70,5 @@ HEALTHCHECK --interval=30s --timeout=10s --start-period=15s --retries=3 \
 # Switch to non-root user for security
 USER headlessx
 
-# Start the Node.js application
-# Nota: El log dice que usas 'src/app.js', no 'src/server.js'. Lo he corregido.
-CMD ["node", "src/app.js"]
+# Start the Node.js application directly (no PM2 needed in container)
+CMD ["node", "src/server.js"]
